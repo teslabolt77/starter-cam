@@ -427,7 +427,6 @@ def index():
         uptime_min=st.get("uptime_min"),
         live_ts=ts,
         live_height=h,
-        initial_height=st.get("initial_height_px"),
         live_rej=rej if ts else None,
         interval_label=interval_label,
         graph_tag=mtime_tag(REPORT_PNG),
@@ -444,7 +443,8 @@ def api_state():
     interval_label = st.get("interval_label") or "service"
     out = {
         
-        \"initial_height\": st.get(\"initial_height_px\"),"running": running,
+        "running": running,
+        "initial_height_px": st.get("initial_height_px"),
         "status": st.get("status", "Idle"),
         "start_time": st.get("start_time"),
         "last_capture": st.get("last_capture"),
