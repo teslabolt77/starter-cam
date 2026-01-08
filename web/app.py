@@ -182,6 +182,7 @@ HTML = r"""
         <div id="nol" class="muted" style="display:none;">No image yet — start captures or click “Test capture live”.</div>
         <div class="muted" style="margin-top:8px;">
           Latest height: <span id="live_height">{{ live_height or '—' }}</span> px
+          <br>Initial height: <span id="initial_height">{{ initial_height or '—' }}</span> px
           {% if live_rej is not none %}(rejected=<span id="live_rej">{{ live_rej }}</span>){% endif %}<br>
           Latest time: <span id="live_ts">{{ live_ts or '—' }}</span>
         </div>
@@ -380,6 +381,7 @@ async function poll(){
 
       set("live_ts", s.live_ts);
       set("live_height", s.live_height);
+      set("initial_height", s.initial_height);
       if(document.getElementById("live_rej")) set("live_rej", s.live_rej);
 
       // bust-cache live image every poll
@@ -425,6 +427,7 @@ def index():
         uptime_min=st.get("uptime_min"),
         live_ts=ts,
         live_height=h,
+        initial_height=st.get("initial_height_px"),
         live_rej=rej if ts else None,
         interval_label=interval_label,
         graph_tag=mtime_tag(REPORT_PNG),
