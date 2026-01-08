@@ -1,0 +1,15 @@
+{
+  "running": false,
+  "status": "Test capture complete \u2705",
+  "start_time": "2026-01-07T18:36:51",
+  "end_time": "2026-01-07T18:38:27",
+  "completed": true,
+  "uptime_min": 1,
+  "initial_height_px": 217,
+  "last_capture": "2026-01-07T18:37:56",
+  "last_height_px": 357,
+  "last_conf": 28008.48,
+  "last_rejected": 0,
+  "last_ok": true,
+  "heartbeat": "2026-01-07T18:38:00"
+}

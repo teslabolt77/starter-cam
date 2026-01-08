@@ -1,0 +1,234 @@
+from flask import Flask, send_file, jsonify, render_template_string, redirect, make_response
+import os, json, subprocess, csv
+
+BASE = os.path.expanduser("~/starter_cam")
+STATE_PATH = os.path.join(BASE, "web", "state.json")
+
+REPORT_JSON = os.path.join(BASE, "reports", "session_latest.json")
+REPORT_PNG  = os.path.join(BASE, "reports", "session_latest.png")
+TIMELAPSE   = os.path.join(BASE, "timelapse", "session_latest.mp4")
+LIVE_IMG    = os.path.join(BASE, "reports", "live.jpg")
+
+LOG_CSV = os.path.join(BASE, "starter_log.csv")
+CAPTURE_SCRIPT = os.path.join(BASE, "starter_capture.py")
+FINALIZE = os.path.join(BASE, "finalize_session.py")
+
+SERVICE = "starter-capture.service"
+
+app = Flask(__name__)
+
+def load_state():
+    if not os.path.exists(STATE_PATH):
+        return {}
+    try:
+        with open(STATE_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_state(st):
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    with open(STATE_PATH, "w") as f:
+        json.dump(st, f, indent=2)
+
+def service_active():
+    r = subprocess.run(["systemctl", "is-active", SERVICE], capture_output=True, text=True)
+    return r.returncode == 0
+
+def last_height():
+    if not os.path.exists(LOG_CSV):
+        return None, None, None
+    try:
+        with open(LOG_CSV, "r", newline="") as f:
+            r = list(csv.DictReader(f))
+        if not r:
+            return None, None, None
+        row = r[-1]
+        return row.get("timestamp"), row.get("height_px"), row.get("rejected", "0")
+    except Exception:
+        return None, None, None
+
+def test_capture_live():
+    tmpdir = os.path.join(BASE, "reports", "live_tmp")
+    os.makedirs(tmpdir, exist_ok=True)
+    subprocess.run(["python3", CAPTURE_SCRIPT, "--save-image", "--image-dir", tmpdir, "--prefix", "live"], check=False)
+
+    jpgs = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir) if f.endswith(".jpg")]
+    if not jpgs:
+        return False
+    newest = max(jpgs, key=os.path.getmtime)
+    os.makedirs(os.path.dirname(LIVE_IMG), exist_ok=True)
+    subprocess.run(["cp", "-f", newest, LIVE_IMG], check=False)
+
+    for f in jpgs:
+        try: os.remove(f)
+        except: pass
+    return True
+
+def no_cache(resp):
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
+
+def mtime_tag(path):
+    try:
+        return str(int(os.path.getmtime(path)))
+    except Exception:
+        return "0"
+
+HTML = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sourdough Starter Monitor</title>
+  <meta http-equiv="refresh" content="15">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin:0; padding:20px; background:#0e0e11; color:#e6e6eb; }
+    h2 { margin:0 0 12px 0; font-weight:600; }
+    .card { background:#16161d; border:1px solid #2a2a35; padding:16px; border-radius:14px; max-width: 980px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; align-items:center; }
+    button { padding:10px 14px; border-radius:12px; border:1px solid #2a2a35; background:#222232; color:#e6e6eb; cursor:pointer; }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity:0.5; cursor:not-allowed; }
+    a { color:#7aa2ff; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    img { max-width:100%; border-radius:10px; border:1px solid #2a2a35; background:#0e0e11; }
+    .muted { color:#9a9ab0; font-size:0.95em; }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid #2a2a35; background:#111118; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    @media(max-width: 900px){ .grid{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <h2>Sourdough Starter Monitor</h2>
+  <div class="card">
+    <div class="row">
+      <form method="POST" action="/start"><button {{ 'disabled' if running else '' }}>Start captures</button></form>
+      <form method="POST" action="/stop"><button {{ 'disabled' if not running else '' }}>Stop + build outputs</button></form>
+      <form method="POST" action="/test"><button>Test capture (live)</button></form>
+      <span class="pill">{{ status }}</span>
+    </div>
+
+    <div class="muted">
+      Start: {{ start_time or '—' }}<br>
+      Last capture: {{ last_capture or '—' }}<br>
+      Heartbeat: {{ heartbeat or '—' }}<br>
+      Uptime: {{ uptime_min if uptime_min is not none else '—' }} min<br>
+      End: {{ end_time or '—' }}<br>
+      Interval: every 15 minutes (systemd)
+    </div>
+
+    <div class="grid" style="margin-top:14px;">
+      <div>
+        <b>Live preview:</b><br>
+        <img src="/live?v={{ live_tag }}" onerror="this.style.display='none';document.getElementById('nol').style.display='block';">
+        <div id="nol" class="muted" style="display:none;">No live preview yet — click “Test capture (live)”.</div>
+        <div class="muted" style="margin-top:8px;">
+          Latest height: {{ live_height or '—' }} px {% if live_rej is not none %}(rejected={{ live_rej }}){% endif %}<br>
+          Latest time: {{ live_ts or '—' }}
+        </div>
+      </div>
+
+      <div>
+        <b>Session graph:</b><br>
+        <img src="/graph?v={{ graph_tag }}" onerror="this.style.display='none';document.getElementById('nog').style.display='block';">
+        <div id="nog" class="muted" style="display:none;">No session graph yet (stop the run to generate).</div>
+
+        <div style="margin-top:14px;">
+          <b>Session timelapse:</b>
+          <a href="/timelapse?v={{ tl_tag }}">session_latest.mp4</a><br>
+          <b>Session summary:</b> <a href="/api/summary">/api/summary</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+@app.route("/")
+def index():
+    st = load_state()
+    running = service_active()
+    st["running"] = running
+    save_state(st)
+
+    ts, h, rej = last_height()
+
+    return render_template_string(
+        HTML,
+        running=running,
+        status=st.get("status", "Idle"),
+        start_time=st.get("start_time"),
+        last_capture=st.get("last_capture"),
+        end_time=st.get("end_time"),
+        heartbeat=st.get("heartbeat"),
+        uptime_min=st.get("uptime_min"),
+        live_ts=ts,
+        live_height=h,
+        live_rej=rej if ts else None,
+        graph_tag=mtime_tag(REPORT_PNG),
+        tl_tag=mtime_tag(TIMELAPSE),
+        live_tag=mtime_tag(LIVE_IMG),
+    )
+
+@app.route("/start", methods=["POST"])
+def start():
+    st = load_state()
+    st["status"] = "Starting…"
+    st["completed"] = False
+    st["end_time"] = None
+    save_state(st)
+    subprocess.run(["sudo", "systemctl", "start", SERVICE], check=False)
+    return redirect("/")
+
+@app.route("/stop", methods=["POST"])
+def stop():
+    st = load_state()
+    st["status"] = "Stopping…"
+    save_state(st)
+    subprocess.run(["sudo", "systemctl", "stop", SERVICE], check=False)
+    subprocess.run(["python3", FINALIZE], check=False)
+    return redirect("/")
+
+@app.route("/test", methods=["POST"])
+def test():
+    ok = test_capture_live()
+    st = load_state()
+    st["status"] = "Test capture complete ✅" if ok else "Test capture failed ❌"
+    save_state(st)
+    return redirect("/")
+
+@app.route("/api/summary")
+def summary():
+    if not os.path.exists(REPORT_JSON):
+        return jsonify({"error":"No session report yet (stop the run first)."}), 404
+    with open(REPORT_JSON) as f:
+        return jsonify(json.load(f))
+
+@app.route("/graph")
+def graph():
+    if not os.path.exists(REPORT_PNG):
+        return "No session graph yet", 404
+    resp = make_response(send_file(REPORT_PNG, mimetype="image/png", conditional=False))
+    return no_cache(resp)
+
+@app.route("/timelapse")
+def timelapse():
+    if not os.path.exists(TIMELAPSE):
+        return "No session timelapse yet", 404
+    resp = make_response(send_file(TIMELAPSE, mimetype="video/mp4", conditional=False))
+    return no_cache(resp)
+
+@app.route("/live")
+def live():
+    if not os.path.exists(LIVE_IMG):
+        return "No live preview yet", 404
+    resp = make_response(send_file(LIVE_IMG, mimetype="image/jpeg", conditional=False))
+    return no_cache(resp)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080, debug=False)

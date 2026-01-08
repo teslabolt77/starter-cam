@@ -1,0 +1,17 @@
+{
+  "start_time": "2026-01-04T23:25:58",
+  "end_time": "2026-01-06T01:34:24",
+  "running": false,
+  "status": "Completed \u2705",
+  "completed": true,
+  "last_capture": "2026-01-06T01:34:21",
+  "heartbeat": "2026-01-06T01:34:21",
+  "uptime_min": 0,
+  "last_height_px": 345,
+  "last_conf": 2.01,
+  "last_rejected": 0,
+  "last_roi": "192:384",
+  "last_jar": "96:441",
+  "last_ok": true,
+  "last_raw_output": "/home/pi/starter_cam/photos_run/run_20260105_190647.jpg\nSURFACE_Y 262 conf=3.79 ROI[192:384] JAR[96:441]\n\n[ WARN:0@0.418] global ./modules/videoio/src/cap_gstreamer.cpp (862) isPipelinePlaying OpenCV | GStreamer warning: GStreamer: pipeline have not been created"
+}

@@ -1,0 +1,107 @@
+import csv, json, os, sys
+from datetime import datetime
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+
+LOG = os.path.expanduser("~/starter_cam/starter_log.csv")
+OUT_PNG = os.path.expanduser("~/starter_cam/reports/session_latest.png")
+OUT_JSON = os.path.expanduser("~/starter_cam/reports/session_latest.json")
+
+def parse_iso(ts: str) -> datetime:
+    return datetime.fromisoformat(ts)
+
+def is_rejected(row: dict) -> bool:
+    try:
+        return int(row.get("rejected", "0")) == 1
+    except Exception:
+        return False
+
+def moving_avg(xs, k=7):
+    if k <= 1 or len(xs) < k:
+        return xs[:]
+    out=[]
+    half=k//2
+    for i in range(len(xs)):
+        a=max(0,i-half); b=min(len(xs), i+half+1)
+        out.append(sum(xs[a:b])/(b-a))
+    return out
+
+def main():
+    if len(sys.argv) < 3:
+        print("Usage: session_report.py <start_iso> <end_iso>")
+        return 2
+
+    start = parse_iso(sys.argv[1])
+    end = parse_iso(sys.argv[2])
+
+    if not os.path.exists(LOG):
+        print("No log file.")
+        return 1
+
+    t_ok, h_ok = [], []
+    t_bad, h_bad = [], []
+    total=0
+
+    with open(LOG, "r", newline="") as f:
+        r = csv.DictReader(f)
+        for row in r:
+            ts = parse_iso(row["timestamp"])
+            if not (start <= ts <= end):
+                continue
+            total += 1
+            h = float(row["height_px"])
+            if is_rejected(row):
+                t_bad.append(ts); h_bad.append(h)
+            else:
+                t_ok.append(ts); h_ok.append(h)
+
+    if len(h_ok) < 3:
+        print("Not enough accepted points in session.")
+        return 0
+
+    hs = moving_avg(h_ok, k=7)
+    peak_i = max(range(len(hs)), key=lambda i: hs[i])
+    peak_time = t_ok[peak_i]
+
+    os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.plot(t_ok, h_ok, marker="o", linewidth=1, alpha=0.35, label="Accepted")
+    ax.plot(t_ok, hs, linewidth=2, label="Smoothed")
+    if t_bad:
+        ax.scatter(t_bad, h_bad, marker="x", s=40, linewidths=1.5, color="red", alpha=0.25, label="Rejected")
+    ax.axvline(peak_time, linestyle="--", linewidth=1, label="Peak")
+
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%-I %p"))
+
+    ax.set_xlim(start, end)
+    ax.set_xlabel("Time (hours)")
+    ax.set_ylabel("Height (px)")
+    ax.set_title(f"Session rise • Peak ~ {peak_time.strftime('%-I:%M %p')}")
+    ax.legend()
+    fig.autofmt_xdate()
+    plt.tight_layout()
+    plt.savefig(OUT_PNG, dpi=160)
+    plt.close()
+
+    summary = {
+        "session_start": start.isoformat(timespec="seconds"),
+        "session_end": end.isoformat(timespec="seconds"),
+        "samples_total": total,
+        "samples_accepted": len(h_ok),
+        "samples_rejected": len(h_bad),
+        "peak_time": peak_time.isoformat(timespec="seconds"),
+        "latest_time": t_ok[-1].isoformat(timespec="seconds"),
+        "latest_height_px": round(h_ok[-1], 2),
+    }
+    with open(OUT_JSON, "w") as f:
+        json.dump(summary, f, indent=2)
+
+    print("Wrote session report:", OUT_PNG)
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())

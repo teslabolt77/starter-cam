@@ -1,0 +1,11 @@
+{
+  "window_start": "2026-01-03T21:00:00",
+  "window_end": "2026-01-04T11:25:04",
+  "samples_total": 190,
+  "samples_accepted": 190,
+  "samples_rejected": 0,
+  "peak_time": "2026-01-03T23:20:11",
+  "peak_height_px_smoothed": 442.0,
+  "latest_time": "2026-01-04T11:00:21",
+  "latest_height_px": 297.0
+}
