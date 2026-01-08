@@ -415,6 +415,7 @@ def index():
 
     return render_template_string(
         HTML,
+        initial_height=st.get("initial_height_px"),
         running=running,
         status=st.get("status", "Idle"),
         start_time=st.get("start_time"),
@@ -439,7 +440,8 @@ def api_state():
 
     interval_label = st.get("interval_label") or "service"
     out = {
-        "running": running,
+        
+        \"initial_height\": st.get(\"initial_height_px\"),"running": running,
         "status": st.get("status", "Idle"),
         "start_time": st.get("start_time"),
         "last_capture": st.get("last_capture"),
