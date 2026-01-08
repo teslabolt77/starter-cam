@@ -1,0 +1,19 @@
+# Python junk
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Runtime data (DO NOT COMMIT)
+starter_log.csv
+web/state.json
+
+# Generated outputs
+reports/
+timelapse/
+photos_run/
+
+# Misc
+*.log
+*.tmp
+.DS_Store
