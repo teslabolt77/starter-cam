@@ -190,7 +190,7 @@ HTML = r"""
 
       <div>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <b>Session graph (live): Rise (px)</b>
+          <b>Session graph (live): Rise (%)</b>
           <span class="small">updates every 5s</span>
         </div>
         <canvas id="chart" width="900" height="420"></canvas>
@@ -210,7 +210,10 @@ HTML = r"""
 function pad2(n){ return (n<10?'0':'')+n; }
 
 function drawChart(points){
-  const c = document.getElementById("chart");
+  
+  // Jar bottom Y (px). Used for rise% since start.
+  const JAR_BOTTOM_Y = 441;
+const c = document.getElementById("chart");
   const ctx = c.getContext("2d");
   const W = c.width, H = c.height;
 
@@ -241,9 +244,13 @@ function drawChart(points){
   }
 
   // Convert to "rise" so rising starter = positive numbers (because y decreases as it rises)
+  // Percent baseline: 0% at first capture
+  const initialY = points[0].y;
+  const initialFillPx = Math.max(1, JAR_BOTTOM_Y - initialY);
+
   const rises = points.map(p => ({
     ts: p.ts,
-    r: (typeof p.y === "number") ? (initY - p.y) : null,
+    r: ((initialY - p.y) / initialFillPx) * 100.0,
     rejected: p.rejected
   }));
 
@@ -293,7 +300,7 @@ function drawChart(points){
     ctx.moveTo(ml, py);
     ctx.lineTo(ml+iw, py);
     ctx.stroke();
-    ctx.fillText(vv.toFixed(0), 8, py+4);
+    ctx.fillText(vv.toFixed(0) + "%", 8, py+4);
   }
 
   // X axis: hour marks (0h, 1h, 2h...) like the static graph
@@ -359,7 +366,7 @@ function drawChart(points){
   // title
   ctx.fillStyle = "#e6e6eb";
   ctx.font = "14px system-ui";
-  ctx.fillText("Rise (px)", 8, 14);
+  ctx.fillText("Rise (%)", 8, 14);
 }
 
 async function poll(){
