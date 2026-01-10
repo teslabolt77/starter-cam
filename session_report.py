@@ -53,7 +53,8 @@ def main():
 
     # --- convert surface_y → rise (human-intuitive) ---
     y0 = ys_raw[0]
-    rise_px = [y0 - y for y in ys_raw]
+    initial_fill_px = max(1.0, (441 - y0))
+    rise_pct = [((y0 - y) / initial_fill_px) * 100.0 for y in ys_raw]
 
     # --- hours since start ---
     t0 = ts_list[0]
@@ -70,10 +71,10 @@ def main():
                     {
                         "ts": ts.isoformat(),
                         "hour": h,
-                        "rise_px": rp,
+                        "rise_pct": rp,
                         "rejected": rej
                     }
-                    for ts, h, rp, rej in zip(ts_list, hours, rise_px, rejs)
+                    for ts, h, rp, rej in zip(ts_list, hours, rise_pct, rejs)
                 ]
             },
             f,
@@ -82,10 +83,10 @@ def main():
 
     # --- plot static graph ---
     plt.figure(figsize=(10, 4))
-    plt.plot(hours, rise_px, linewidth=2)
-    plt.title("Session rise")
+    plt.plot(hours, rise_pct, linewidth=2)
+    plt.title("Session rise (%)")
     plt.xlabel("Hours since start")
-    plt.ylabel("Rise (px)")
+    plt.ylabel("Rise (%)")
     plt.grid(True, alpha=0.3)
 
     # Dynamic hour ticks (1 → N, cap at 24)

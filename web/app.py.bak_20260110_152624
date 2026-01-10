@@ -147,11 +147,11 @@ def read_log_tail(n=600):
             if len(parts) < 3:
                 continue
             ts = parts[0]
-            y = parts[1]
-            # CSV formats:
-            # old: ts,y,rej
-            # new: ts,y,conf,jar_top,jar_bot,rej
-            rej = parts[5] if len(parts) >= 6 else parts[2]
+              y  = parts[1]
+              # CSV formats:
+              # old: ts,y,rej
+              # new: ts,y,conf,jar_top,jar_bot,rej
+              rej = parts[5] if len(parts) >= 6 else parts[2]
             try:
                 datetime.fromisoformat(ts)
                 pts.append({"ts": ts, "y": float(y), "rejected": int(rej)})
@@ -674,6 +674,9 @@ def index():
         live_tag=live_tag,
     )
 
+@app.route("/api/state")
+@app.route("/api/cam", methods=["GET", "POST"])
+
 @app.route("/api/cam", methods=["GET", "POST"])
 
 def api_cam():
@@ -747,7 +750,6 @@ def api_cam():
     })
 
 
-@app.route("/api/state")
 def api_state():
     st = load_state()
     running = service_active()

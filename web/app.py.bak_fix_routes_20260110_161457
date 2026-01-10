@@ -674,6 +674,9 @@ def index():
         live_tag=live_tag,
     )
 
+@app.route("/api/state")
+@app.route("/api/cam", methods=["GET", "POST"])
+
 @app.route("/api/cam", methods=["GET", "POST"])
 
 def api_cam():
@@ -747,7 +750,6 @@ def api_cam():
     })
 
 
-@app.route("/api/state")
 def api_state():
     st = load_state()
     running = service_active()
